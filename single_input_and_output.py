@@ -1,5 +1,5 @@
 """
-Реализация градиентного спуска
+Реализация градиентного спуска с одним входом
 """
 games = [1.1]
 expectation = 0.8
@@ -7,6 +7,7 @@ weight = 0.0
 alpha = 0.01
 input = games[0]
 
+# Процесс обучения из 4х итераций.
 for iteration in range(4):
     print(f"\nWeight: {weight}")
     prediction = input * weight
