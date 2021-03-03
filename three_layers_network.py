@@ -2,10 +2,16 @@ import numpy as np
 
 
 def relu(x):
+    """
+    Возвращает значения > 0 без изменений, а значениям < 0 присваивает 0 умножая х на False.
+    """
     return (x > 0) * x
 
 
 def relu2deriv(output):
+    """
+    Возвращает 1 (True), если значения > 0 или 0 (False), если значения <= 0.
+    """
     return output > 0
 
 
@@ -37,15 +43,20 @@ for iteration in range(60):
         # 2. Прогноз + Сравнение
         # [i: i+1] необходимо для создания матрицы [[0, 1, 0]] а не списка [0, 1, 0] в случае [i]
         layer_0 = streetlights[i: i+1]
+
+        # Prediction для layer_1 с обнулением значений < 0
         layer_1 = relu(np.dot(layer_0, weights_0_1))
+
+        # Prediction для layer_2
         layer_2 = np.dot(layer_1, weights_1_2)
 
+        # Подсчет величины ошибки error = (prediction - goal) ** 2 и delta.
         layer_2_error += (layer_2 - walk_vs_stop[i: i+1]) ** 2
 
         layer_2_delta = layer_2 - walk_vs_stop[i: i+1]
 
         # 3. Обучение: обратное распространение из layer_2 в layer_1
-        # Умнодение layer_2_delta и weights_1_2 показывает вклад каждго веса в общую ошибку.
+        # Умножение layer_2_delta и weights_1_2 показывает вклад каждго веса в общую ошибку.
         # relu2deriv фильтрует узлы с незначительным вкладом, пропуская только > 0.
         layer_1_delta = np.dot(layer_2_delta, weights_1_2.T) * relu2deriv(layer_1)
 
