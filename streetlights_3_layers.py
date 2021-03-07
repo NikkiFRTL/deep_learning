@@ -1,4 +1,5 @@
 import numpy as np
+from sys import stdout
 
 
 def relu(x):
