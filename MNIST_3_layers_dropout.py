@@ -43,7 +43,7 @@ np.random.seed(1)
 # Корректирующий коэффицент.
 alpha = 0.005
 # Количество узлов на layer_1.
-hidden_size = 40
+hidden_size = 100
 # Итераций в цикле.
 iterations = 300
 # Равно количетсву пикселей в изображении 28*28.
@@ -72,6 +72,13 @@ for j in range(iterations):
         # Размер матрицы layer_1 - 1x40
         layer_1 = relu(np.dot(layer_0, weights_0_1))
 
+        # Прореживание - dropout. Нужно для уменьшения шума и акцентировании внимания на сигнале.
+        # N (в примере 2) - до какого числа от нуля до N, не включительно, будут регенироваться числа.
+        # size (в примере 1х40) - возвращает форму, заполненную случайными числами, заданую в size=.
+        dropout_mask = np.random.randint(2, size=layer_1.shape)
+        # Умножается на 2 для нивелирования потери данных из-за dropout_mask, где случайные данные обращаются 0.
+        layer_1 *= dropout_mask * 2
+
         # Prediction для layer_2
         # Размер матрицы layer_2_delta - 1x10
         layer_2 = np.dot(layer_1, weights_1_2)
@@ -92,6 +99,7 @@ for j in range(iterations):
         # Размер матрицы layer_1_delta  - 1х40
         layer_2_delta = labels[i: i+1] - layer_2
         layer_1_delta = np.dot(layer_2_delta, weights_1_2.T) * relu2deriv(layer_1)
+        layer_1_delta *= dropout_mask
 
         # 4. Обучение: вычисление приращений и корректировка весов
         weight_delta_1_2 = np.dot(layer_1.T, layer_2_delta)
@@ -118,5 +126,5 @@ for j in range(iterations):
                          "I: " + str(j) +
                          " Test-Err: " + str(test_error / float(len(test_images)))[0:5] +
                          " Test-Acc: " + str(test_correct_cnt / float(len(test_images))) +
-                         " Train-Err: " + str(error/float(len(images)))[0:5] +
-                         " Train-Acc: " + str(correct_cnt/float(len(images))))
+                         " Train-Err: " + str(error / float(len(images)))[0:5] +
+                         " Train-Acc: " + str(correct_cnt / float(len(images))))
