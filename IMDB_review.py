@@ -7,7 +7,7 @@ np.random.seed(1)
 
 def similar(target='great'):
     """
-    Функция
+    Функция нахождения
     """
     target_index = word2index[target]
     scores = Counter()
@@ -26,7 +26,7 @@ def sigmoid(x):
     return 1/(1 + np.exp(-x))
 
 
-with open("reviews.txt") as f:
+with open("Harry Potter and the sorcerer's stone.txt") as f:
     raw_reviews = f.readlines()
 
 with open('labels.txt') as f:
@@ -41,7 +41,9 @@ for sentence in tokens:
     for word in sentence:
         if len(word) > 0:
             vocab.add(word)
+
 vocab = list(vocab)
+
 
 # Создание словаря ключ-значение в ввиде слово-цифра.
 word2index = {}
@@ -93,7 +95,7 @@ for iter in range(iterations):
         layer_1 = sigmoid(np.sum(weights_0_1[x], axis=0))
         layer_2 = sigmoid(np.dot(layer_1, weights_1_2))
 
-        # Разность между прогнозом и истиной.
+        # Разность между прогнозом и истиной для предсказания эмоциональной окраски.
         layer_2_delta = layer_2 - y
         # Обратное распространение.
         layer_1_delta = np.dot(layer_2_delta, weights_1_2.T)
