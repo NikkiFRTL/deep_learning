@@ -173,6 +173,12 @@ class Tensor(object):
         return str(self.data.__str__())
 
 
+
+
+
+
+
+
 a = Tensor([1, 2, 3, 4, 5], autograd=True)
 b = Tensor([2, 2, 2, 2, 2], autograd=True)
 c = Tensor([5, 4, 3, 2, 1], autograd=True)
