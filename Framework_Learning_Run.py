@@ -1,7 +1,12 @@
 from Framework_Code import Tensor, SGD, Sequential, Linear, MSELoss, Tanh, Sigmoid, Embedding
 import numpy as np
-np.random.seed(0)
+"""
+Реализовав эту нейронную сеть, мы выявили корреляцию между входными индексами 1 и 2 и прогнозами 0 и 1. 
+Теоретически индексы 1 и 2 могут соответствовать словам (или некоторым другим входным объектам), и в заключительном
+примере мы выявим это соответствие. Этот пример должен был показать, как действует слой с векторным представлением.
+"""
 
+np.random.seed(0)
 
 data = Tensor(np.array([1, 2, 1, 2]), autograd=True)
 target = Tensor(np.array([[0], [1], [0], [1]]), autograd=True)
@@ -32,3 +37,4 @@ for i in range(10):
     weights_optimizer.step()
 
     print(loss)
+    print(embed.forward())
