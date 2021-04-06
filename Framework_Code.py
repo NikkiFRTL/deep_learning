@@ -139,6 +139,11 @@ class Tensor:
                         new_grad[indices_[i]] += grad_[i]
                     self.creators[0].backward(Tensor(new_grad))
 
+                if self.creation_op == "cross_entropy": # TODO describe this
+
+                    dx = self.softmax_output - self.target_dist
+                    self.creators[0].backward(Tensor(dx))
+
     def __add__(self, other):
         if self.autograd and other.autograd:
             return Tensor(self.data + other.data,
@@ -246,6 +251,36 @@ class Tensor:
             new.index_select_indices = indices
             return new
         return Tensor(self.data[indices.data])
+
+    def cross_entropy(self, target_indices):
+        """
+        Вычисление softmax и потерь(loss) производится в одной функции.
+        Намного быстрее вместе вычислить градиент softmax и отрицательный логарифм подобия в функции перекрестной
+        энтропии, чем распространять их вперед и назад по отдельности в двух разных модулях.
+        """
+        # Определение функции softmax.
+        temp = np.exp(self.data)
+        softmax_output = temp / np.sum(temp,
+                                       axis=len(self.data.shape)-1,
+                                       keepdims=True)
+
+        # Преобразование матрицы в (1, N). В примере (4, 1) в (1, 4).
+        t = target_indices.data.flatten()
+        # .reshape(len(t), -1) - не обязательно.
+        p = softmax_output.reshape(len(t), -1)
+        target_dist = np.eye(p.shape[1])[t]
+        loss = -(np.log(p) * target_dist).sum(1).mean()
+
+        if self.autograd:
+            out = Tensor(loss,
+                         autograd=True,
+                         creators=[self],
+                         creation_op="cross_entropy")
+            out.softmax_output = softmax_output
+            out.target_dist = target_dist
+            return out
+
+        return Tensor(loss)
 
 
 class SGD:
@@ -389,12 +424,76 @@ class Embedding(Layer):
         return self.weight.index_select(input)
 
 
+class CrossEntropyLoss(Layer):  # TODO Describe this
+    """
+    Теперь вычисление softmax и потерь производится в одном классе
+    """
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, input, target):
+        return input.cross_entropy(target)
+
+
+class RNNCell(Layer):
+    """
+    Рекуррентная нейронная сеть имеет вектор состояния, который передается из предыдущей итерации обучения в следующую.
+    В данном случае это переменная hidden, которая одновременно является входным параметром и выходным значением
+    функции forward.
+    Рекуррентная нейронная сеть имеет также несколько разных весовых матриц: одна отображает входные векторы в скрытые
+    (обработка входных данных), другая отображает скрытые векторы в скрытые векторы
+    (коррекция каждого скрытого вектора на основе предыдущего состояния)
+    и третья, необязательная, отображает скрытый слой в выходной, генерируя прогноз на основе скрытых векторов.
+    Наша реализация RNNCell включает все три матрицы.
+    Слой self .w_ih отображает входной слой в скрытый, self .w_hh — скрытый слой в скрытый и
+    self .w_ho — скрытый слой в выходной.
+    Обратите внимание на размерности всех трех матриц.
+    Оба размера — n_input матрицы self .w_ih и n_output матрицы self .w_ho — определяются размером словаря.
+    Все остальные размеры определяются параметром n_hidden.
+    Параметр activation определяет нелинейную функцию для применения к скрытым векторам в каждой итерации.
+    """
+    def __init__(self, n_inputs, n_hidden, n_output, activation="sigmoid"):
+        super().__init__()
+
+        self.n_inputs = n_inputs
+        self.n_hidden = n_hidden
+        self.n_output = n_output
+
+        if activation == "sigmoid":
+            self.activation = Sigmoid()
+
+        elif activation == "tanh":
+            self.activation = Tanh()
+
+        else:
+            raise Exception("Non-linearity not found")
+
+        self.w_ih = Linear(n_inputs, n_hidden)
+        self.w_hh = Linear(n_hidden, n_hidden)
+        self.w_ho = Linear(n_hidden, n_output)
+
+        self.parameters += self.w_ih.get_parameters()
+        self.parameters += self.w_hh.get_parameters()
+        self.parameters += self.w_ho.get_parameters()
+
+    def forward(self, input, hidden):
+
+        from_prev_hidden = self.w_hh.forward(hidden)
+        combined = self.w_ih.forward(input) + from_prev_hidden
+        new_hidden = self.activation.forward(combined)
+        output = self.w_ho.forward(new_hidden)
+        return output, new_hidden
+
+    def init_hidden(self, batch_size=1):
+        return Tensor(np.zeros((batch_size, self.n_hidden)), autograd=True)
+
+
 class Words2Vectors:
 
     identity = np.eye(5)
-    print(f"Вместо слов, мы должны передать индексы слов.", "\n", identity, "\n")
-    print(f"Возвращает ту же матрицу, но заменит каждое число в исходной матрице соответствующей строкой. \n"
-          f"Так, двумерная матрица индексов превратится в трехмерную матрицу векторных представлений (строк). \n",
-          identity[np.array([[1, 2, 3, 4],
-                             [2, 3, 4, 0],
-                             [4, 3, 2, 1]])])
+    #print(f"Вместо слов, мы должны передать индексы слов.", "\n", identity, "\n")
+    #print(f"Возвращает ту же матрицу, но заменит каждое число в исходной матрице соответствующей строкой. \n"
+          #f"Так, двумерная матрица индексов превратится в трехмерную матрицу векторных представлений (строк). \n",
+          #identity[np.array([[1, 2, 3, 4],
+                             #[2, 3, 4, 0],
+                             #[4, 3, 2, 1]])])

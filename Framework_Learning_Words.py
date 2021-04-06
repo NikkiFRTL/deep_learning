@@ -1,0 +1,79 @@
+import sys, random, math
+from collections import Counter
+import numpy as np
+from Framework_Code import Tensor, SGD, Sequential, Linear, MSELoss, Tanh, Sigmoid, Embedding, CrossEntropyLoss, RNNCell
+
+
+with open('tasksv11/en/qa1_single-supporting-fact_train.txt') as f:
+    raw = f.readlines()
+
+tokens = list()
+for line in raw[0:1000]:
+    tokens.append(line.lower().replace("\n", "").split(" ")[1:])
+
+new_tokens = list()
+for line in tokens:
+    new_tokens.append(['-'] * (6 - len(line)) + line)
+tokens = new_tokens
+
+vocab = set()
+for sent in tokens:
+    for word in sent:
+        vocab.add(word)
+vocab = list(vocab)
+
+word2index = {}
+for index, word in enumerate(vocab):
+    word2index[index] = word
+
+
+def word2indices(sentence):
+    idx = list()
+    for w in sentence:
+        idx.append(word2index[w])
+    return idx
+
+
+indices = list()
+for line in tokens:
+    indices.append(word2indices(line))
+
+# Теперь можно инициализировать рекуррентный слой входными векторными представлениями и обучить сеть.
+# Эта сеть немного сложнее (она имеет один дополнительный слой).
+data = np.array(indices)
+
+# Здесь сначала определяются входные векторные представления, а затем инициализируется рекуррентная ячейка.
+# Eдиничный рекуррентный слой принято называть ячейкой.
+# Если создать другой слой, объединяющий произвольное число ячеек, он будет называться рекуррентной
+# нейронной сетью и принимать дополнительный входной параметр n_layers.
+
+embed = Embedding(vocab_size=len(vocab), dim=16)
+model = RNNCell(n_inputs=16, n_hidden=16, n_output=len(vocab))
+
+criterion = CrossEntropyLoss()
+params = model.get_parameters() + embed.get_parameters()
+weight_optimizer = SGD(parameters=params, alpha=0.05)
+
+for iter in range(1000):
+
+    batch_size = 100
+    total_loss = 0
+
+    hidden = model.init_hidden(batch_size=batch_size)
+
+    for t in range(5):
+
+        input = Tensor(data[0:batch_size, t], autograd=True)
+        rnn_input = embed.forward(input=input)
+        output, hidden = model.forward(rnn_input, hidden=hidden)
+
+    target = Tensor(data[0:batch_size, t+1], autograd=True)
+    loss = criterion.forward(output, target)
+    loss.backward()
+    weight_optimizer.step()
+    total_loss += loss.data
+
+    if iter % 200 == 0:
+        p_correct = (target.data == np.argmax(output.data, axis=1)).mean()
+        print_loss = total_loss / (len(data)/batch_size)
+        print(f"Loss: {print_loss}    Correct:  {p_correct}")

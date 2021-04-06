@@ -1,4 +1,4 @@
-from Framework_Code import Tensor, SGD, Sequential, Linear, MSELoss, Tanh, Sigmoid, Embedding
+from Framework_Code import Tensor, SGD, Sequential, Linear, MSELoss, Tanh, Sigmoid, Embedding, CrossEntropyLoss
 import numpy as np
 """
 Реализовав эту нейронную сеть, мы выявили корреляцию между входными индексами 1 и 2 и прогнозами 0 и 1. 
@@ -7,20 +7,25 @@ import numpy as np
 """
 
 np.random.seed(0)
-
+# Исходные индексы.
 data = Tensor(np.array([1, 2, 1, 2]), autograd=True)
+
+# Целевые индексы.
 target = Tensor(np.array([[0], [1], [0], [1]]), autograd=True)
 
-embed = Embedding(5, 3)
+embed = Embedding(3, 3)
 
 # Список весов(слоёв) запакованный в класс.
-model = Sequential([embed, Tanh(), Linear(3, 1), Sigmoid()])
+# embed, Tanh(), Linear(3, 1), Sigmoid() - для реализации среднеквадратичной ошибки MSELoss.
+model = Sequential([embed, Tanh(), Linear(3, 4)])
 
 # Слой с функцией потерь - среднеквадратическая ошибка.
-criterion = MSELoss()
+# criterion = MSELoss() - для реализации среднеквадратичной ошибки MSELoss.
+# criterion = CrossEntropyLoss() - для реализации перекрестной энтропии (для ошибки).
+criterion = CrossEntropyLoss()
 
 # Корректировка весов (оптимизатор стохастического градиентного спуска).
-weights_optimizer = SGD(parameters=model.get_parameters(), alpha=0.05)
+weights_optimizer = SGD(parameters=model.get_parameters(), alpha=0.1)
 
 for i in range(10):
 
@@ -37,4 +42,4 @@ for i in range(10):
     weights_optimizer.step()
 
     print(loss)
-    print(embed.forward())
+
