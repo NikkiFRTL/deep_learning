@@ -9,6 +9,7 @@ class Tensor:
     графе) и нет необходимости вручную определять логику обратного
     распространения (потому что она уже реализована в методе . backward ()).
     """
+
     def __init__(self, data,
                  autograd=False,
                  creators=None,
@@ -53,6 +54,12 @@ class Tensor:
 
             if grad_origin is not None:
                 if self.children[grad_origin.id] == 0:
+                    return
+                    print(self.id)
+                    print(self.creation_op)
+                    print(len(self.creators))
+                    for c in self.creators:
+                        print(c.creation_op)
                     raise Exception("Cannot backprop more than once")
                 else:
                     self.children[grad_origin.id] -= 1
@@ -139,7 +146,7 @@ class Tensor:
                         new_grad[indices_[i]] += grad_[i]
                     self.creators[0].backward(Tensor(new_grad))
 
-                if self.creation_op == "cross_entropy": # TODO describe this
+                if self.creation_op == "cross_entropy":  # TODO describe this
 
                     dx = self.softmax_output - self.target_dist
                     self.creators[0].backward(Tensor(dx))
@@ -195,7 +202,7 @@ class Tensor:
             return Tensor(new_data,
                           autograd=True,
                           creators=[self],
-                          creation_op="expand_"+str(dim))
+                          creation_op="expand_" + str(dim))
         return Tensor(new_data)
 
     def transpose(self):
@@ -252,6 +259,13 @@ class Tensor:
             return new
         return Tensor(self.data[indices.data])
 
+    def softmax(self):
+        temp = np.exp(self.data)
+        softmax_output = temp / np.sum(temp,
+                                       axis=len(self.data.shape) - 1,
+                                       keepdims=True)
+        return softmax_output
+
     def cross_entropy(self, target_indices):
         """
         Вычисление softmax и потерь(loss) производится в одной функции.
@@ -261,7 +275,7 @@ class Tensor:
         # Определение функции softmax.
         temp = np.exp(self.data)
         softmax_output = temp / np.sum(temp,
-                                       axis=len(self.data.shape)-1,
+                                       axis=len(self.data.shape) - 1,
                                        keepdims=True)
 
         # Преобразование матрицы в (1, N). В примере (4, 1) в (1, 4).
@@ -288,6 +302,7 @@ class SGD:
     Stochastic Gradient Descent optimizer.
     Оптимизатор стохастического градиентного спуска
     """
+
     def __init__(self, parameters, alpha=0.01):
         self.parameters = parameters
         self.alpha = alpha
@@ -310,6 +325,7 @@ class Layer:
     Это коллекция процедур, часто используемых в прямом распространении, упакованных в простой программный
     интерфейс с методом .forward() для их использования.
     """
+
     def __init__(self):
         self.parameters = list()
 
@@ -351,6 +367,7 @@ class Sequential(Layer):
     Модель последовательного слоя, который осуществляет прямое распространение через список слоев,
     когда выход одного слоя передается на вход следующего.
     """
+
     def __init__(self, layers=list()):
         super().__init__()
 
@@ -376,6 +393,7 @@ class MSELoss(Layer):
     Loss-function layer - Mean Squared Error.
     Слой с функцией потерь - среднеквадратическая ошибка.
     """
+
     def __init__(self):
         super().__init__()
 
@@ -407,6 +425,7 @@ class Embedding(Layer):
     Слой должен инициализировать список (правильной длины) векторных представлений слов (правильного размера).
 
     """
+
     def __init__(self, vocab_size, dim):
         super().__init__()
 
@@ -428,6 +447,7 @@ class CrossEntropyLoss(Layer):  # TODO Describe this
     """
     Теперь вычисление softmax и потерь производится в одном классе
     """
+
     def __init__(self):
         super().__init__()
 
@@ -452,6 +472,7 @@ class RNNCell(Layer):
     Все остальные размеры определяются параметром n_hidden.
     Параметр activation определяет нелинейную функцию для применения к скрытым векторам в каждой итерации.
     """
+
     def __init__(self, n_inputs, n_hidden, n_output, activation="sigmoid"):
         super().__init__()
 
@@ -489,11 +510,119 @@ class RNNCell(Layer):
 
 
 class Words2Vectors:
-
     identity = np.eye(5)
-    #print(f"Вместо слов, мы должны передать индексы слов.", "\n", identity, "\n")
-    #print(f"Возвращает ту же матрицу, но заменит каждое число в исходной матрице соответствующей строкой. \n"
-          #f"Так, двумерная матрица индексов превратится в трехмерную матрицу векторных представлений (строк). \n",
-          #identity[np.array([[1, 2, 3, 4],
-                             #[2, 3, 4, 0],
-                             #[4, 3, 2, 1]])])
+    # print(f"Вместо слов, мы должны передать индексы слов.", "\n", identity, "\n")
+    # print(f"Возвращает ту же матрицу, но заменит каждое число в исходной матрице соответствующей строкой. \n"
+    # f"Так, двумерная матрица индексов превратится в трехмерную матрицу векторных представлений (строк). \n",
+    # identity[np.array([[1, 2, 3, 4],
+    # [2, 3, 4, 0],
+    # [4, 3, 2, 1]])])
+
+
+class LSTMCell(Layer):
+    """
+    Слой долгой краткосрочной памяти LSTM.
+    LSTM создает следующее скрытое состояние, копируя предыдущее, а затем
+    добавляет или удаляет информацию по мере необходимости. Для добавления
+    и удаления информации LSTM использует механизмы, которые называют
+    вентилями, или фильтрами (gate).
+    """
+
+    def __init__(self, n_inputs, n_hidden, n_output):
+        super().__init__()
+
+        self.n_inputs = n_inputs
+        self.n_hidden = n_hidden
+        self.n_output = n_output
+
+        self.xf = Linear(n_inputs, n_hidden)
+        self.xi = Linear(n_inputs, n_hidden)
+        self.xo = Linear(n_inputs, n_hidden)
+        self.xc = Linear(n_inputs, n_hidden)
+
+        self.hf = Linear(n_hidden, n_hidden)
+        self.hi = Linear(n_hidden, n_hidden)
+        self.ho = Linear(n_hidden, n_hidden)
+        self.hcell = Linear(n_hidden, n_hidden)
+
+        self.w_ho = Linear(n_hidden, n_output)
+
+        self.parameters += self.xf.get_parameters()
+        self.parameters += self.xi.get_parameters()
+        self.parameters += self.xo.get_parameters()
+        self.parameters += self.xc.get_parameters()
+
+        self.parameters += self.hf.get_parameters()
+        self.parameters += self.hi.get_parameters()
+        self.parameters += self.ho.get_parameters()
+        self.parameters += self.hcell.get_parameters()
+
+        self.parameters += self.w_ho.get_parameters()
+
+    def forward(self, input, hidden):
+        """
+        Логика прямого распространения в ячейке LSTM:
+        Ячейка LSTM имеет два вектора со скрытым состоянием: h (от англ. hidden — скрытый) и cell.
+        Каждое новое значение является суммой предыдущего значения и приращения 'и', взвешенных весами 'f' и 'i'.
+        Здесь f — это «забывающий» («forget») вентиль (фильтр).
+        Если этот вес получит значение 0, новая ячейка «забудет» то, что видела прежде.
+        Если i получит значение 1, приращение 'и' будет полностью добавлено в новую ячейку.
+        Переменная 'о' — это выходной вентиль (фильтр), который определяет,
+        какая доля состояния ячейки попадет в прогноз.
+        Например, если все значения в о равны нулю, тогда строка self.w_ho.forward(h)
+        вернет прогноз, полностью игнорируя состояние ячейки.
+
+        Они действуют вместе и гарантируют, что для корректировки информации, хранящейся в cell,
+        не потребуется применять матричное умножение или нелинейную функцию активации.
+        Иначе говоря, избавляют от необходимости вызывать nonlinearity(cell) или cell.dot(weights).
+
+        Такой подход позволяет модели LSTM сохранять информацию на протяжении
+        временной последовательности, не беспокоясь о затухании или взрывном росте
+        градиентов. Каждый шаг заключается в копировании (если f имеет ненулевое
+        значение) и прибавлении приращения (если i имеет ненулевое значение).
+        Скрытое значение h — это замаскированная версия ячейки, используемая для получения прогноза.
+        Обратите также внимание, что все три вентиля формируются совершенно одинаково.
+        Они имеют свои весовые матрицы, но каждый зависит от входных
+        значений и скрытого состояния, пропущенных через функцию sigmoid.
+        Именно эта нелинейная функция sigmoid делает их полезными в качестве вентилей,
+        преобразуя в диапазон от 0 до 1.
+
+        И последнее критическое замечание в отношении вектора h. Очевидно, что он
+        все еще подвержен эффекту затухания и взрывного роста градиентов, потому
+        что фактически используется так же, как в простой рекуррентной нейронной
+        сети. Во-первых, поскольку вектор h всегда создается из комбинации векторов,
+        которые сжимаются с помощью tanh и sigmoid, эффект взрывного роста градиентов
+        на самом деле отсутствует — проявляется только эффект затухания. Но
+        в итоге в этом нет ничего страшного, потому что h зависит от ячейки cell, которая
+        может переносить информацию на дальние расстояния: ту информацию, которую
+        затухающие градиенты не способны переносить. То есть вся перспективная
+        информация транспортируется с помощью cell, a h — это всего лишь локальная
+        интерпретация cell, удобная для получения прогноза на выходе и активации
+        вентилей на следующем шаге. Проще говоря, способность с переносить информацию
+        на большие расстояния нивелирует неспособность h к тому же самому.
+        """
+        prev_hidden = hidden[0]
+        prev_cell = hidden[1]
+
+        # 3 вентиля f,i,o и вектор приращений u:
+        # Механизм управления забыванием (forget).
+        f = (self.xf.forward(input) + self.hf.forward(prev_hidden)).sigmoid()
+        # Механизм управления вводом (input).
+        i = (self.xi.forward(input) + self.hi.forward(prev_hidden)).sigmoid()
+        # Механизм управления выводом (output).
+        o = (self.xo.forward(input) + self.ho.forward(prev_hidden)).sigmoid()
+        # Механизм управления изменением (update).
+        u = (self.xc.forward(input) + self.hcell.forward(prev_hidden)).tanh()
+
+        cell = (f * prev_cell) + (i * u)
+        h = o * cell.tanh()
+        output = self.w_ho.forward(h)
+
+        return output, (h, cell)
+
+    def init_hidden(self, batch_size=1):
+        init_h = Tensor(np.zeros((batch_size, self.n_hidden)), autograd=True)
+        init_cell = Tensor(np.zeros((batch_size, self.n_hidden)), autograd=True)
+        init_h.data[:, 0] += 1
+        init_cell.data[:, 0] += 1
+        return init_h, init_cell
