@@ -142,6 +142,5 @@ def train(iterations=100):
         weight_optimizer.alpha *= 0.99
 
 
-train(100)
-
-# print(generate_sample(n=500, init_char='\n'))
+train(2)
+print(generate_sample(n=500, init_char='\n'))
